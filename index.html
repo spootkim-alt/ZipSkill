@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compresseur d'Images</title>
+    <title>Compresseur d'Images & Signature</title>
     <style>
         * {
             margin: 0;
@@ -105,6 +105,10 @@
             transform: none;
         }
 
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
         .quality-control {
             margin: 25px 0;
             display: none;
@@ -187,9 +191,73 @@
             margin-top: 20px;
         }
 
+        /* Signature styles */
+        .signature-container {
+            text-align: center;
+        }
+
+        #signatureCanvas {
+            border: 3px solid #667eea;
+            border-radius: 15px;
+            cursor: crosshair;
+            touch-action: none;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            max-width: 100%;
+        }
+
+        .signature-controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .color-picker {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .color-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+
+        .color-option.active {
+            border-color: #333;
+            transform: scale(1.2);
+        }
+
+        .pen-size {
+            margin: 15px 0;
+        }
+
+        .pen-size label {
+            display: block;
+            margin-bottom: 10px;
+            color: #555;
+            font-weight: 600;
+        }
+
         @media (max-width: 600px) {
             .preview-grid {
                 grid-template-columns: 1fr;
+            }
+            
+            #signatureCanvas {
+                width: 100%;
             }
         }
 
@@ -206,7 +274,8 @@
             <p style="margin-top: 10px; font-size: 14px; color: #999;">Veuillez accéder à cette page via l'application autorisée.</p>
         </div>
 
-        <div id="mainContent">
+        <!-- Compresseur d'images -->
+        <div id="compressorContent" class="hidden">
             <h1>🖼️ Compresseur d'Images</h1>
             
             <div class="upload-area" id="uploadArea">
@@ -246,35 +315,74 @@
                 </div>
             </div>
         </div>
+
+        <!-- Signature -->
+        <div id="signatureContent" class="signature-container hidden">
+            <h1>✍️ Capture de Signature</h1>
+            
+            <div class="info" style="margin-bottom: 20px;">
+                Dessinez votre signature ci-dessous avec votre souris ou votre doigt
+            </div>
+
+            <canvas id="signatureCanvas" width="500" height="250"></canvas>
+
+            <div class="color-picker">
+                <div class="color-option active" style="background: #000000;" data-color="#000000"></div>
+                <div class="color-option" style="background: #0000FF;" data-color="#0000FF"></div>
+                <div class="color-option" style="background: #FF0000;" data-color="#FF0000"></div>
+                <div class="color-option" style="background: #00FF00;" data-color="#00FF00"></div>
+                <div class="color-option" style="background: #667eea;" data-color="#667eea"></div>
+            </div>
+
+            <div class="pen-size">
+                <label>
+                    Épaisseur du trait : <span id="penSizeValue">3</span>px
+                </label>
+                <input type="range" id="penSizeSlider" min="1" max="10" value="3">
+            </div>
+
+            <div class="signature-controls">
+                <button class="btn btn-secondary" id="clearSignature">🗑️ Effacer</button>
+                <button class="btn" id="downloadSignature">⬇️ Télécharger la signature</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        // Validation du token au chargement
-        (function() {
-            const u = new URLSearchParams(window.location.search);
-            const t = u.get('tk');
-            
-            if (!t || !v(t)) {
-                document.getElementById('mainContent').classList.add('hidden');
-                document.getElementById('errorScreen').classList.remove('hidden');
-                return;
-            }
+        // Détection de la page (signature ou compresseur)
+        const isSignaturePage = window.location.pathname.endsWith('/signature') || 
+                               window.location.pathname.endsWith('/signature.html') ||
+                               window.location.search.includes('page=signature');
 
-            // Initialisation de l'application
-            initApp();
-        })();
+        if (isSignaturePage) {
+            // Mode signature (pas de vérification de token)
+            document.getElementById('signatureContent').classList.remove('hidden');
+            initSignature();
+        } else {
+            // Mode compresseur (avec vérification de token)
+            (function() {
+                const u = new URLSearchParams(window.location.search);
+                const t = u.get('tk');
+                
+                if (!t || !v(t)) {
+                    document.getElementById('errorScreen').classList.remove('hidden');
+                    return;
+                }
+
+                document.getElementById('compressorContent').classList.remove('hidden');
+                initCompressor();
+            })();
+        }
 
         function v(t) {
             try {
                 const parts = t.split('-');
                 if (parts.length !== 3) return false;
                 
-                // Accepte hex ou décimal
                 const p1 = parts[0].match(/^[0-9]+$/) ? parseInt(parts[0], 10) : parseInt(parts[0], 16);
                 const p2 = parts[1].match(/^[0-9]+$/) ? parseInt(parts[1], 10) : parseInt(parts[1], 16);
                 const p3 = parts[2].match(/^[0-9]+$/) ? parseInt(parts[2], 10) : parseInt(parts[2], 16);
                 
-                // Vérifie aujourd'hui ET hier (pour gérer les fuseaux horaires)
                 const today = new Date();
                 const yesterday = new Date(today);
                 yesterday.setDate(yesterday.getDate() - 1);
@@ -301,7 +409,120 @@
             }
         }
 
-        function initApp() {
+        // Initialisation de la signature
+        function initSignature() {
+            const canvas = document.getElementById('signatureCanvas');
+            const ctx = canvas.getContext('2d');
+            const clearBtn = document.getElementById('clearSignature');
+            const downloadBtn = document.getElementById('downloadSignature');
+            const colorOptions = document.querySelectorAll('.color-option');
+            const penSizeSlider = document.getElementById('penSizeSlider');
+            const penSizeValue = document.getElementById('penSizeValue');
+
+            let isDrawing = false;
+            let currentColor = '#000000';
+            let penSize = 3;
+
+            // Ajuster la taille du canvas pour mobile
+            function resizeCanvas() {
+                const container = canvas.parentElement;
+                const maxWidth = Math.min(500, container.clientWidth - 40);
+                canvas.width = maxWidth;
+                canvas.height = maxWidth / 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            // Gestion des couleurs
+            colorOptions.forEach(option => {
+                option.addEventListener('click', () => {
+                    colorOptions.forEach(o => o.classList.remove('active'));
+                    option.classList.add('active');
+                    currentColor = option.dataset.color;
+                });
+            });
+
+            // Gestion de l'épaisseur
+            penSizeSlider.addEventListener('input', (e) => {
+                penSize = parseInt(e.target.value);
+                penSizeValue.textContent = penSize;
+            });
+
+            // Dessin avec souris
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+
+            // Dessin tactile
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('mousedown', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                canvas.dispatchEvent(mouseEvent);
+            });
+
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('mousemove', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                canvas.dispatchEvent(mouseEvent);
+            });
+
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                const mouseEvent = new MouseEvent('mouseup', {});
+                canvas.dispatchEvent(mouseEvent);
+            });
+
+            function startDrawing(e) {
+                isDrawing = true;
+                const rect = canvas.getBoundingClientRect();
+                ctx.beginPath();
+                ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                const rect = canvas.getBoundingClientRect();
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = penSize;
+                ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+                ctx.stroke();
+            }
+
+            function stopDrawing() {
+                isDrawing = false;
+            }
+
+            // Effacer
+            clearBtn.addEventListener('click', () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            });
+
+            // Télécharger
+            downloadBtn.addEventListener('click', () => {
+                canvas.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'signature.png';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+            });
+        }
+
+        // Initialisation du compresseur
+        function initCompressor() {
             const uploadArea = document.getElementById('uploadArea');
             const fileInput = document.getElementById('fileInput');
             const qualityControl = document.getElementById('qualityControl');
