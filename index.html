@@ -266,7 +266,6 @@
 
         function v(t) {
             try {
-                const d = new Date();
                 const parts = t.split('-');
                 if (parts.length !== 3) return false;
                 
@@ -275,15 +274,28 @@
                 const p2 = parts[1].match(/^[0-9]+$/) ? parseInt(parts[1], 10) : parseInt(parts[1], 16);
                 const p3 = parts[2].match(/^[0-9]+$/) ? parseInt(parts[2], 10) : parseInt(parts[2], 16);
                 
-                const dy = d.getFullYear();
-                const dm = d.getMonth() + 1;
-                const dd = d.getDate();
+                // Vérifie aujourd'hui ET hier (pour gérer les fuseaux horaires)
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
                 
-                const x = (dy * 17 + dm * 31 + dd * 7) % 9973;
-                const y = (dy + dm * 12 + dd * 23) % 7919;
-                const z = (dy * 3 + dm * 5 + dd * 11) % 6547;
+                const dates = [today, yesterday];
                 
-                return p1 === x && p2 === y && p3 === z;
+                for (const d of dates) {
+                    const dy = d.getFullYear();
+                    const dm = d.getMonth() + 1;
+                    const dd = d.getDate();
+                    
+                    const x = (dy * 17 + dm * 31 + dd * 7) % 9973;
+                    const y = (dy + dm * 12 + dd * 23) % 7919;
+                    const z = (dy * 3 + dm * 5 + dd * 11) % 6547;
+                    
+                    if (p1 === x && p2 === y && p3 === z) {
+                        return true;
+                    }
+                }
+                
+                return false;
             } catch {
                 return false;
             }
