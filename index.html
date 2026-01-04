@@ -579,7 +579,18 @@
                     const url = URL.createObjectURL(compressedBlob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'image_compressée.jpg';
+                    const maintenant = new Date();
+
+                    // 2. Extraire les composants du temps
+                    const hh = String(maintenant.getHours()).padStart(2, '0');
+                    const mm = String(maintenant.getMinutes()).padStart(2, '0');
+                    const ss = String(maintenant.getSeconds()).padStart(2, '0');
+                    
+                    // 3. Créer la chaîne de caractères (ex: 14h30m15s)
+                    const horodatage = `${hh}${mm}${ss}`;
+                    
+                    // 4. L'assigner au nom du fichier
+                    a.download = `image_compressée_${horodatage}.jpg`;
                     a.click();
                     URL.revokeObjectURL(url);
                 }
